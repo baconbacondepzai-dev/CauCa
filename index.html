@@ -1,0 +1,388 @@
+<!DOCTYPE1 html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Game Câu Cá 3D Super Fishing</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; user-select: none; }
+        #canvas-container { width: 100vw; height: 100vh; display: block; }
+        
+        /* GUI Overlay */
+        .hud { position: absolute; top: 10px; left: 10px; color: white; text-shadow: 2px 2px 4px #000; font-size: 16px; z-index: 10; }
+        .hud-item { background: rgba(0,0,0,0.5); padding: 8px 15px; border-radius: 20px; margin-bottom: 5px; display: inline-block; }
+        
+        /* Admin Button */
+        .admin-btn { position: absolute; top: 10px; right: 10px; background: linear-gradient(135deg, #ff416c, #ff4b2b); color: white; border: none; padding: 10px 15px; border-radius: 12px; font-weight: bold; cursor: pointer; z-index: 10; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        
+        /* Controls UI */
+        .action-btn { position: absolute; bottom: 30px; right: 30px; width: 90px; height: 90px; border-radius: 50%; background: linear-gradient(135deg, #11998e, #38ef7d); border: 4px solid white; color: white; font-size: 18px; font-weight: bold; cursor: pointer; z-index: 10; box-shadow: 0 6px 15px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; text-align: center; }
+        .action-btn:active { transform: scale(0.95); }
+        
+        /* Fish Health Bar */
+        .hp-container { position: absolute; top: 20%; left: 50%; transform: translate(-50%, -50%); width: 280px; background: rgba(0,0,0,0.7); border-radius: 15px; padding: 10px; text-align: center; color: white; display: none; z-index: 10; border: 2px solid #ffd700; }
+        .hp-bar-bg { width: 100%; height: 20px; background: #555; border-radius: 10px; overflow: hidden; margin-top: 5px; }
+        .hp-bar-fill { width: 100%; height: 100%; background: linear-gradient(90deg, #ff4b2b, #ff416c); transition: width 0.1s ease; }
+        
+        /* NPC Buttons */
+        .npc-container { position: absolute; bottom: 30px; left: 30px; display: flex; gap: 10px; z-index: 10; }
+        .npc-btn { background: rgba(255, 255, 255, 0.9); border: none; padding: 12px 18px; border-radius: 12px; font-weight: bold; color: #333; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        
+        /* Modals (Shop / Admin) */
+        .modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(20, 20, 30, 0.95); border: 2px solid #4e54c8; color: white; padding: 20px; border-radius: 20px; min-width: 300px; display: none; z-index: 20; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
+        .modal h2 { margin-top: 0; color: #4e54c8; text-align: center; }
+        .modal-close { position: absolute; top: 10px; right: 15px; background: none; border: none; color: #fff; font-size: 20px; cursor: pointer; }
+        .shop-item { display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.1); padding: 10px; margin: 8px 0; border-radius: 10px; }
+        .shop-item button { background: #38ef7d; border: none; padding: 6px 12px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        
+        /* Admin Inputs */
+        .admin-input { width: 100%; padding: 8px; margin: 8px 0; border-radius: 8px; border: 1px solid #555; background: #222; color: white; box-sizing: border-box; }
+        
+        /* Notification */
+        #msg-box { position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%); color: #ffd700; font-size: 24px; font-weight: bold; text-shadow: 2px 2px 8px #000; display: none; z-index: 15; text-align: center; }
+    </style>
+
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+
+    <!-- HUD Overlay -->
+    <div class="hud">
+        <div class="hud-item">👤 Tên: <span id="player-name">Cần Thủ</span></div><br>
+        <div class="hud-item">💰 Tiền: <span id="player-money">0</span> VNĐ</div><br>
+        <div class="hud-item">🎣 Cần: <span id="current-rod">Cần Gỗ (Sức mạnh: 10)</span></div>
+    </div>
+
+    <button class="admin-btn" onclick="openModal('admin-modal')">⚙️ Admin</button>
+
+    <!-- NPC Action Buttons -->
+    <div class="npc-container">
+        <button class="npc-btn" onclick="openModal('rod-shop')">🛒 Shop Cần</button>
+        <button class="npc-btn" onclick="openModal('fish-shop')">🐟 Bán Cá</button>
+    </div>
+
+    <!-- Main Action Button -->
+    <button id="action-btn" class="action-btn" onclick="handleAction()">THẢ CÂU</button>
+
+    <!-- Fish Health Bar -->
+    <div id="hp-container" class="hp-container">
+        <div id="fish-title">ĐÃ CẮN CÂU!</div>
+        <div class="hp-bar-bg"><div id="hp-bar-fill" class="hp-bar-fill"></div></div>
+        <div style="margin-top: 5px; font-size: 14px;">HP: <span id="hp-text">100/100</span></div>
+    </div>
+
+    <div id="msg-box"></div>
+
+    <!-- Modal: Shop Cần -->
+    <div id="rod-shop" class="modal">
+        <button class="modal-close" onclick="closeModal('rod-shop')">✕</button>
+        <h2>SHOP CẦN CÂU</h2>
+        <div class="shop-item">
+            <div><b>Cần Bamboo Pro</b><br><small>Sức mạnh: 25 HP/lần</small></div>
+            <button onclick="buyRod('Cần Bamboo Pro', 25, 50000)">50.000đ</button>
+        </div>
+        <div class="shop-item">
+            <div><b>Cần Carbon VIP</b><br><small>Sức mạnh: 60 HP/lần</small></div>
+            <button onclick="buyRod('Cần Carbon VIP', 60, 200000)">200.000đ</button>
+        </div>
+        <div class="shop-item">
+            <div><b>Cần Rồng Vàng</b><br><small>Sức mạnh: 150 HP/lần</small></div>
+            <button onclick="buyRod('Cần Rồng Vàng', 150, 1000000)">1.000.000đ</button>
+        </div>
+    </div>
+
+    <!-- Modal: Bán Cá -->
+    <div id="fish-shop" class="modal">
+        <button class="modal-close" onclick="closeModal('fish-shop')">✕</button>
+        <h2>SHOP BÁN CÁ</h2>
+        <p>Giỏ cá hiện tại: <b id="inventory-count">0</b> con</p>
+        <button style="width:100%; padding: 12px; background: #38ef7d; border:none; border-radius: 10px; font-weight:bold;" onclick="sellAllFish()">BÁN TẤT CẢ CÁ</button>
+    </div>
+
+    <!-- Modal: Admin Panel -->
+    <div id="admin-modal" class="modal">
+        <button class="modal-close" onclick="closeModal('admin-modal')">✕</button>
+        <h2>ADMIN PANEL</h2>
+        <label>Tên Người Chơi:</label>
+        <input type="text" id="admin-name-input" class="admin-input">
+        <label>Chỉnh Số Tiền (VNĐ):</label>
+        <input type="number" id="admin-money-input" class="admin-input">
+        <button style="width:100%; padding: 10px; background: #ff416c; color:white; border:none; border-radius:10px; font-weight:bold; margin-top: 10px;" onclick="applyAdmin()">ÁP DỤNG</button>
+    </div>
+
+    <script>
+        // --- GAME STATE ---
+        let playerData = {
+            name: "Cần Thủ VIP",
+            money: 100000,
+            rodName: "Cần Gỗ Ban Đầu",
+            rodPower: 10,
+            inventory: [] // Chứa cá đã câu được
+        };
+
+        let gameState = "IDLE"; // IDLE, WAITING, BITING, REELING
+        let currentFish = null;
+        let fishHP = 0;
+        let maxFishHP = 0;
+
+        // --- THREE.JS SCENE SETUP ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87ceeb); // Bầu trời
+        scene.fog = new THREE.FogExp2(0x87ceeb, 0.015);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 5, 10);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        container.appendChild(renderer.domElement);
+
+        // Controls: Xoay camera mượt mà
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2 - 0.01; // Không nhìn xuống dưới mặt nước quá sâu
+        controls.minDistance = 3;
+        controls.maxDistance = 20;
+
+        // Lights
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        sunLight.position.set(20, 40, 20);
+        scene.add(sunLight);
+
+        // Water (Mặt nước đẹp đơn giản)
+        const waterGeometry = new THREE.PlaneGeometry(200, 200, 32, 32);
+        const waterMaterial = new THREE.MeshPhongMaterial({
+            color: 0x006699,
+            shininess: 80,
+            transparent: true,
+            opacity: 0.8,
+            flatShading: true
+        });
+        const water = new THREE.Mesh(waterGeometry, waterMaterial);
+        water.rotation.x = -Math.PI / 2;
+        scene.add(water);
+
+        // Island / Pier (Bờ câu)
+        const pierGeo = new THREE.BoxGeometry(6, 0.5, 8);
+        const pierMat = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+        const pier = new THREE.Mesh(pierGeo, pierMat);
+        pier.position.set(0, 0.2, 5);
+        scene.add(pier);
+
+        // Fishing Rod (Cần câu 3D)
+        const rodGroup = new THREE.Group();
+        const rodGeo = new THREE.CylinderGeometry(0.02, 0.08, 4, 8);
+        const rodMat = new THREE.MeshStandardMaterial({ color: 0xd2691e, metalness: 0.5 });
+        const rodMesh = new THREE.Mesh(rodGeo, rodMat);
+        rodMesh.position.set(0, 2, 0);
+        rodMesh.rotation.x = Math.PI / 3;
+        rodGroup.add(rodMesh);
+        rodGroup.position.set(1, 1, 4);
+        scene.add(rodGroup);
+
+        // Bobber (Phao câu)
+        const bobberGeo = new THREE.SphereGeometry(0.2, 16, 16);
+        const bobberMat = new THREE.MeshPhongMaterial({ color: 0xff0000 });
+        const bobber = new THREE.Mesh(bobberGeo, bobberMat);
+        bobber.visible = false;
+        scene.add(bobber);
+
+        // --- GAME LOGIC ---
+
+        function updateUI() {
+            document.getElementById('player-name').innerText = playerData.name;
+            document.getElementById('player-money').innerText = playerData.money.toLocaleString();
+            document.getElementById('current-rod').innerText = `${playerData.rodName} (Sức mạnh: ${playerData.rodPower})`;
+            document.getElementById('inventory-count').innerText = playerData.inventory.length;
+        }
+
+        function showMessage(text, duration = 2000) {
+            const box = document.getElementById('msg-box');
+            box.innerText = text;
+            box.style.display = 'block';
+            setTimeout(() => { box.style.display = 'none'; }, duration);
+        }
+
+        function handleAction() {
+            const btn = document.getElementById('action-btn');
+
+            if (gameState === "IDLE") {
+                // THẢ CÂU
+                gameState = "WAITING";
+                btn.innerText = "ĐỜI CÁ...";
+                btn.style.background = "linear-gradient(135deg, #f7b731, #ffa801)";
+                
+                // Đặt phao xuống nước
+                bobber.position.set(0, 0, -2);
+                bobber.visible = true;
+                showMessage("Đã thả câu! Chờ cá cắn...");
+
+                // Random thời gian cá cắn (2-5s)
+                setTimeout(fishBite, 2000 + Math.random() * 3000);
+
+            } else if (gameState === "BITING") {
+                // BẮT ĐẦU KÉO CÁ
+                gameState = "REELING";
+                btn.innerText = "KÉO!!";
+                btn.style.background = "linear-gradient(135deg, #ff416c, #ff4b2b)";
+                document.getElementById('hp-container').style.display = 'block';
+                updateHPBar();
+
+            } else if (gameState === "REELING") {
+                // KÉO CÁ (GIẢM HP)
+                fishHP -= playerData.rodPower;
+                if (fishHP < 0) fishHP = 0;
+                
+                // Hiệu ứng nhún phao
+                bobber.position.y = -0.3;
+                setTimeout(() => { bobber.position.y = 0; }, 100);
+
+                updateHPBar();
+
+                if (fishHP <= 0) {
+                    // CÂU THÀNH CÔNG!
+                    playerData.inventory.push(currentFish);
+                    showMessage(`🎉 BẠN ĐÃ CÂU ĐƯỢC:\n${currentFish.name} (${currentFish.weight}kg)!`, 3000);
+                    resetFishing();
+                }
+            }
+        }
+
+        function fishBite() {
+            if (gameState !== "WAITING") return;
+            gameState = "BITING";
+            
+            // Random Loại Cá (Cá 500kg có tỷ lệ 2%)
+            const rand = Math.random() * 100;
+            if (rand <= 2) { // 2% Tỷ lệ
+                currentFish = { name: "🐋 THỦY QUÁI BẠCH TẠNG", weight: 500, price: 5000000, hp: 800 };
+            } else if (rand <= 20) {
+                currentFish = { name: "🦈 Cá Shamu", weight: Math.floor(Math.random() * 100) + 100, price: 500000, hp: 300 };
+            } else if (rand <= 50) {
+                currentFish = { name: "🐟 Cá Ngừ Đại Dương", weight: Math.floor(Math.random() * 40) + 20, price: 100000, hp: 120 };
+            } else {
+                currentFish = { name: "Rô Đồng", weight: Math.floor(Math.random() * 5) + 1, price: 10000, hp: 40 };
+            }
+
+            fishHP = currentFish.hp;
+            maxFishHP = currentFish.hp;
+
+            showMessage("❗ CÁ ĐÃ CẮN CÂU! BẤM KÉO NGAY!", 1500);
+            
+            // Phao giật giật
+            let jiggle = setInterval(() => {
+                if(gameState === "BITING") {
+                    bobber.position.y = (Math.random() - 0.5) * 0.4;
+                } else {
+                    clearInterval(jiggle);
+                }
+            }, 100);
+        }
+
+        function updateHPBar() {
+            const pct = (fishHP / maxFishHP) * 100;
+            document.getElementById('hp-bar-fill').style.width = pct + '%';
+            document.getElementById('hp-text').innerText = `${fishHP}/${maxFishHP}`;
+            document.getElementById('fish-title').innerText = `${currentFish.name} (${currentFish.weight}kg)`;
+        }
+
+        function resetFishing() {
+            gameState = "IDLE";
+            bobber.visible = false;
+            document.getElementById('hp-container').style.display = 'none';
+            const btn = document.getElementById('action-btn');
+            btn.innerText = "THẢ CÂU";
+            btn.style.background = "linear-gradient(135deg, #11998e, #38ef7d)";
+            updateUI();
+        }
+
+        // --- SHOP & ADMIN FUNCTIONS ---
+        function openModal(id) {
+            document.getElementById(id).style.display = 'block';
+            if(id === 'admin-modal') {
+                document.getElementById('admin-name-input').value = playerData.name;
+                document.getElementById('admin-money-input').value = playerData.money;
+            }
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).style.display = 'none';
+        }
+
+        function buyRod(name, power, price) {
+            if (playerData.money >= price) {
+                playerData.money -= price;
+                playerData.rodName = name;
+                playerData.rodPower = power;
+                updateUI();
+                showMessage(`Mua thành công ${name}!`);
+                closeModal('rod-shop');
+            } else {
+                alert("Bạn không đủ tiền VNĐ!");
+            }
+        }
+
+        function sellAllFish() {
+            if (playerData.inventory.length === 0) {
+                alert("Bạn không có cá để bán!");
+                return;
+            }
+            let total = 0;
+            playerData.inventory.forEach(f => total += f.price);
+            playerData.money += total;
+            playerData.inventory = [];
+            updateUI();
+            showMessage(`Đã bán tất cả cá thu về ${total.toLocaleString()} VNĐ!`);
+            closeModal('fish-shop');
+        }
+
+        function applyAdmin() {
+            const newName = document.getElementById('admin-name-input').value;
+            const newMoney = parseInt(document.getElementById('admin-money-input').value);
+            if (newName) playerData.name = newName;
+            if (!isNaN(newMoney)) playerData.money = newMoney;
+            updateUI();
+            closeModal('admin-modal');
+            showMessage("Đã cập nhật Admin!");
+        }
+
+        // --- ANIMATION LOOP ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Hiệu ứng sóng nước nhẹ
+            const time = Date.now() * 0.002;
+            water.geometry.verticesNeedUpdate = true;
+            
+            // Phao dập dềnh khi thả
+            if (gameState === "WAITING") {
+                bobber.position.y = Math.sin(time * 3) * 0.1;
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // Resize Event
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Initialize
+        updateUI();
+        animate();
+    </script>
+</body>
+</html>
